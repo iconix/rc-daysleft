@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>days left at rc</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📅</text></svg>">
+    <style>
+        :root {
+            /* base colors */
+            --color-dark: #3f3f46;
+            --color-light: #f4f4f5;
+            --color-black: #262626;
+            --color-white: #ffffff;
+
+            /* status colors */
+            --color-today: #FFD700;
+            --color-past: #4CAF50;
+            --color-future: #E8F5E9;
+            --color-special: #1B5E20;
+
+            /* ui colors */
+            --color-tooltip-bg: #000000;
+            --color-tooltip-text: #ffffff;
+            --color-excluded-bg: #f5f5f5;
+            --color-excluded-border: #bfbfbf;
+            --color-footer-text: #666666;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--color-dark);
+        }
+
+        .container {
+            padding: 0 20%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        @media screen and (max-width: 1000px) {
+            .container {
+                padding: 0 6%;
+            }
+        }
+
+        header {
+            padding: 50px 0;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: var(--color-black);
+        }
+
+        p {
+            margin-bottom: 1rem;
+        }
+
+        button {
+            background: none;
+            border: none;
+            color: var(--color-black);
+            text-decoration: underline;
+            cursor: pointer;
+            font: inherit;
+            padding: 0;
+            margin-bottom: 1rem;
+        }
+
+        .progress {
+            margin-top: 30px;
+            position: relative;
+        }
+
+        .bar {
+            height: 12px;
+            width: 100%;
+            background-color: var(--color-light);
+            border-radius: 10px;
+        }
+
+        .progress-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0%;
+            height: 12px;
+            background-color: var(--color-black);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        #progress-text {
+            text-align: center;
+            margin-top: 1rem;
+            font-size: 1rem;
+            color: var(--color-dark);
+        }
+
+        .day-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(10px, 1fr));
+            gap: 8px;
+            padding-bottom: 100px;
+        }
+
+        .day {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .day.past {
+            background-color: var(--color-past);
+        }
+
+        .day.future {
+            background-color: var(--color-future);
+        }
+
+        .day.today {
+            background-color: var(--color-today);
+        }
+
+        .day.special {
+            background-color: var(--color-special);
+            border-radius: 0;
+        }
+
+        .day.excluded {
+            background-color: var(--color-excluded-bg);
+            border: 1px dashed var(--color-excluded-border);
+            opacity: 0.7;
+            border-radius: 50%;
+        }
+
+        .tooltip {
+            position: fixed;
+            background: var(--color-tooltip-bg);
+            color: var(--color-tooltip-text);
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 100;
+            display: none;
+            pointer-events: none;
+            max-width: 200px;
+            text-align: center;
+        }
+
+        /*
+        .tooltip a {
+            color: #4CAF50;  // green to match the theme
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        .tooltip a:hover {
+            color: #81C784;  // lighter green
+        }
+        */
+
+        footer {
+            margin-top: -60px;
+            margin-bottom: 40px;
+            font-size: 0.7rem;
+            color: var(--color-footer-text);
+            text-align: center;
+        }
+
+        footer a {
+            color: inherit;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>days left at rc</h1>
+            <main>
+                <p>a visualization of my days left in the winter 1, 2024 <a href='https://www.recurse.com/' target='_blank' rel='nofollow noopener noreferrer'>recurse center</a> batch</p>
+                <div class="progress">
+                    <div class="bar"></div>
+                    <div id="progress-bar" class="progress-bar"></div>
+                    <h2 id="progress-text">Progress: 0%</h2>
+                </div>
+            </main>
+        </header>
+        <div id="day-grid" class="day-grid"></div>
+        <footer>
+            inspired by <a href='https://waitbutwhy.com/2014/05/life-weeks.html' target='_blank' rel='nofollow noopener noreferrer'>Your Life in Weeks</a> from Wait But Why. cribbed format from <a href='https://days.rory.codes/' target='_blank' rel='nofollow noopener noreferrer'>Day by Day</a> by Rory Flint.
+        </footer>
+    </div>
+
+    <script>
+        function toLocalDate(dateString) {
+            // split the string into [year, month, day] parts
+            const [year, month, day] = dateString.split('-').map(num => parseInt(num, 10));
+
+            // use Date object to create local date, using the parsed year, month (0-based), and day
+            return new Date(year, month - 1, day);
+        }
+
+        function ingestConfig(rawConfig) {
+            // validate required fields
+            if (!rawConfig.startDate || !rawConfig.endDate) {
+                throw new Error('start and end dates are required');
+            }
+
+            // validate date format
+            const isValidDate = (dateStr) => {
+                const date = toLocalDate(dateStr);
+                return date instanceof Date && !isNaN(date);
+            };
+
+            if (!isValidDate(rawConfig.startDate) || !isValidDate(rawConfig.endDate)) {
+                throw new Error('invalid date format');
+            }
+
+            // helper to get readable date string for error messages
+            const formatDateForError = (dateStr) => {
+                try {
+                    return toLocalDate(dateStr).toLocaleDateString();
+                } catch (e) {
+                    return dateStr;
+                }
+            };
+
+            // validate main date range
+            const startDate = toLocalDate(rawConfig.startDate);
+            const endDate = toLocalDate(rawConfig.endDate);
+            if (endDate <= startDate) {
+                throw new Error(`end date (${formatDateForError(rawConfig.endDate)}) must be after start date (${formatDateForError(rawConfig.startDate)})`);
+            }
+
+            // transform and validate excluded ranges
+            const excludedRanges = (rawConfig.excludedRanges || []).map(range => {
+                if (!isValidDate(range.start) || !isValidDate(range.end)) {
+                    throw new Error(`invalid date format in range: ${range.label}`);
+                }
+
+                const rangeStart = toLocalDate(range.start);
+                const rangeEnd = toLocalDate(range.end);
+
+                if (rangeEnd < rangeStart) {
+                    throw new Error(
+                        `invalid date range for "${range.label}": ` +
+                        `end date (${formatDateForError(range.end)}) ` +
+                        `must be same as or after start date (${formatDateForError(range.start)})`
+                    );
+                }
+
+                // Validate range is within the main date range
+                if (rangeStart < startDate || rangeEnd > endDate) {
+                    throw new Error(
+                        `date range "${range.label}" (${formatDateForError(range.start)} to ${formatDateForError(range.end)}) ` +
+                        `must be within the main date range (${formatDateForError(rawConfig.startDate)} to ${formatDateForError(rawConfig.endDate)})`
+                    );
+                }
+
+                return {
+                    start: rangeStart,
+                    end: rangeEnd,
+                    label: range.label
+                };
+            });
+
+            return {
+                startDate: toLocalDate(rawConfig.startDate),
+                endDate: toLocalDate(rawConfig.endDate),
+                excludedRanges: (rawConfig.excludedRanges || []).map(range => {
+                    if (!isValidDate(range.start) || !isValidDate(range.end)) {
+                        throw new Error(`invalid date range: ${range.label}`);
+                    }
+                    return {
+                        start: toLocalDate(range.start),
+                        end: toLocalDate(range.end),
+                        label: range.label
+                    };
+                }),
+                excludeWeekends: Boolean(rawConfig.excludeWeekends),
+                specialDays: Object.entries(rawConfig.specialDays || {}).reduce((acc, [date, label]) => {
+                    if (!isValidDate(date)) {
+                        throw new Error(`invalid special day date: ${date}`);
+                    }
+                    acc[date] = label;
+                    return acc;
+                }, {})
+            };
+        }
+
+        const JSON_CONFIG = {
+            startDate: '2024-11-04',
+            endDate: '2025-02-14',
+            excludedRanges: [
+                {
+                    start: '2024-11-05',
+                    end: '2024-11-05',
+                    label: 'US Election Day'
+                },
+                {
+                    start: '2024-11-27',
+                    end: '2024-11-29',
+                    label: 'Thanksgiving Break'
+                },
+                {
+                    start: '2024-12-14',
+                    end: '2025-01-05',
+                    label: 'Winter Break'
+                },
+                // {
+                //     start: '2025-01-20',
+                //     end: '2025-01-20',
+                //     label: 'MLK Day',
+                // },
+            ],
+            excludeWeekends: true,
+            specialDays: {
+                // '2024-11-06': '* made a friend in [Annie Lydens](https://github.com/aelydens) at the pairing workshop',
+                '2024-11-06': '* made a friend at the pairing workshop',
+                '2024-11-08': '* finished [batches of batch viz](https://github.com/iconix/rc-batchviz)<br />* decided to prioritize creativity in batch',
+                '2024-11-11': '* found a fave community @ [the nature of code](https://natureofcode.com/) book club<br />* setup [obsidian](https://obsidian.md/) + [syncthing](https://syncthing.net/) for notes',
+                // '2024-11-12': '* first non-workshop pairing at rc with [Sufian Rhazi](https://abstract.properties/)',
+                '2024-11-12': '* first non-workshop pairing at rc',
+                '2024-11-13': '* completed [first p5.js sketch](https://iconix.github.io/rc-natureofcode/exercise_04/)',
+                // '2024-11-14': '* made an ml friend in [Karen Aragon](https://www.karenaragon.com/) while talking through my [batches of batch viz](https://github.com/iconix/rc-batchviz)',
+                '2024-11-14': '* made an ml friend while talking through my [batches of batch viz](https://github.com/iconix/rc-batchviz)',
+                '2024-11-15': '* deployed v0 of my main batch project: [my personal website](https://ohnadj.pages.dev/)',
+                '2024-11-18': '* published first real [blog post](https://ohnadj.pages.dev/blog/2024/11/rc-reflection-1/) on new personal website',
+                '2024-11-19': '* recreated a top-down pkmn-style town on the web as part of [impossible stuff day](https://github.com/iconix/rc-impossible-town)',
+                '2024-12-02': '* first visit to the hub in brooklyn',
+                '2024-12-05': '* found another fave community @ chart chat for data viz',
+                // '2024-12-12': '* started a \'heartening ml\' doc with my ml friend, [Karen Aragon](https://www.karenaragon.com/)<br />* end-of-batch ceremony for folks exiting batch',
+                '2024-12-12': '* started a \'heartening ml\' doc with my ml friend<br />* end-of-batch ceremony for folks exiting batch',
+                '2025-01-07': '* published first [blog post](https://ohnadj.pages.dev/blog/2025/01/rc-batchviz/) on a project (batches of batch viz)',
+            }
+        };
+        const CONFIG = ingestConfig(JSON_CONFIG);
+
+        function parseMarkdownLinks(text) {
+            // regex to match markdown links [text](url)
+            const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+
+            // TODO: make links clickable again?
+            // return text.replace(linkRegex, '<a href="$2" target="_blank" rel="nofollow noopener noreferrer">$1</a>');
+            return text.replace(linkRegex, '$1');
+        }
+
+        class DayVisualizer {
+            constructor(config) {
+                this.config = config;
+                this.grid = document.getElementById('day-grid');
+                this.progressBar = document.getElementById('progress-bar');
+                this.progressText = document.getElementById('progress-text');
+                this.tooltip = this.createTooltip();
+                this.init();
+            }
+
+            createTooltip() {
+                const tooltip = document.createElement('div');
+                tooltip.className = 'tooltip';
+                document.body.appendChild(tooltip);
+                return tooltip;
+            }
+
+            formatDate(date) {
+                return date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                });
+            }
+
+            getActiveDaysLeft() {
+                const now = new Date();
+                return this.getDaysSince(now, this.config.endDate);
+            }
+
+            getDaysSince(start, end) {
+                let days = 0;
+                let currentDate = new Date(start);
+                while (currentDate <= end) {
+                    if (!this.isDateExcluded(currentDate)) {
+                        days++;
+                    }
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                return days;
+            }
+
+            calculateProgress() {
+                const start = this.config.startDate;
+                const end = this.config.endDate;
+                const now = new Date();
+
+                const total = this.getDaysSince(start, end);
+                const elapsed = this.getDaysSince(start, now);
+
+                const progress = Math.max(0, Math.min(100, (elapsed / total) * 100));
+                return progress.toFixed(2);
+            }
+
+            showTooltip(event, text) {
+                // parse markdown links in the text
+                const parsedText = parseMarkdownLinks(text);
+                this.tooltip.innerHTML = parsedText;
+                this.tooltip.style.display = 'block';
+
+                // position tooltip
+                const tooltipWidth = this.tooltip.offsetWidth;
+                const tooltipHeight = this.tooltip.offsetHeight;
+
+                let left = event.pageX + 10;
+                let top = event.pageY + 10;
+
+                // adjust if tooltip would go off screen
+                if (left + tooltipWidth > window.innerWidth) {
+                    left = event.pageX - tooltipWidth - 10;
+                }
+                if (top + tooltipHeight > window.innerHeight) {
+                    top = event.pageY - tooltipHeight - 10;
+                }
+
+                this.tooltip.style.left = `${left}px`;
+                this.tooltip.style.top = `${top}px`;
+            }
+
+            hideTooltip() {
+                this.tooltip.style.display = 'none';
+            }
+
+            isWeekend(date) {
+                const day = date.getDay();
+                return day === 0 || day === 6; // 0 is Sunday, 6 is Saturday
+            }
+
+            isDateExcluded(date) {
+                // remove any time information from date object
+                date = new Date(date.toDateString());
+
+                const isExcluded = this.config.excludedRanges.some(range =>
+                    date >= range.start && date <= range.end
+                );
+                return isExcluded || (this.config.excludeWeekends && this.isWeekend(date));
+            }
+
+            createDay(date) {
+                const dayElement = document.createElement('div');
+                dayElement.className = 'day';
+
+                const today = new Date();
+                const isPast = date < today;
+                const isToday = date.toDateString() === today.toDateString();
+                const dateString = date.toISOString().split('T')[0];
+                const isSpecial = this.config.specialDays[dateString];
+                const isExcluded = this.isDateExcluded(date);
+
+                if (isExcluded) {
+                    dayElement.classList.add('excluded');
+                } else {
+                    dayElement.classList.add(isPast ? 'past' : 'future');
+                    if (isToday) {
+                        dayElement.classList.add('today');
+                        dayElement.id = 'today';
+                    }
+                    if (isSpecial) {
+                        dayElement.classList.add('special');
+                    }
+                }
+
+                const tooltipText = isExcluded
+                    ? this.createExcludedTooltipText(date)
+                    : isSpecial
+                        ? `${this.formatDate(date)}<br>${this.config.specialDays[dateString]}`
+                        : this.formatDate(date);
+
+                dayElement.addEventListener('mouseover', (e) => this.showTooltip(e, tooltipText));
+                dayElement.addEventListener('mouseout', () => this.hideTooltip());
+                dayElement.addEventListener('mousemove', (e) => {
+                    if (this.tooltip.style.display === 'block') {
+                        this.showTooltip(e, tooltipText);
+                    }
+                });
+
+                return dayElement;
+            }
+
+            createExcludedTooltipText(date) {
+                const excludedRange = this.config.excludedRanges.find(range =>
+                    date >= range.start && date <= range.end
+                );
+                return `${this.formatDate(date)}<br>${excludedRange ? excludedRange.label : this.isWeekend(date) ? 'Weekend' : ''}`;
+            }
+
+            init() {
+                const start = this.config.startDate;
+                const end = this.config.endDate;
+
+                let currentDate = new Date(start);
+                while (currentDate <= end) {
+                    const day = this.createDay(new Date(currentDate));  // create new Date object to avoid mutation
+                    this.grid.appendChild(day);
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+
+                const progress = this.calculateProgress();
+                this.progressBar.style.width = `${progress}%`;
+                this.progressText.textContent = `Progress: ${progress}% (${this.getActiveDaysLeft()} days left)`;
+
+                // update progress periodically
+                setInterval(() => {
+                    const newProgress = this.calculateProgress();
+                    this.progressBar.style.width = `${newProgress}%`;
+                    this.progressText.textContent = `Progress: ${newProgress}% (${this.getActiveDays()} days left)`;
+                }, 3600000); // update every hour
+            }
+        }
+
+        // initialize the visualizer
+        const visualizer = new DayVisualizer(CONFIG);
+    </script>
+</body>
+</html>
