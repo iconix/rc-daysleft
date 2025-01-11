@@ -326,21 +326,17 @@
             ],
             excludeWeekends: true,
             specialDays: {
-                // '2024-11-06': '* made a friend in [Annie Lydens](https://github.com/aelydens) at the pairing workshop',
                 '2024-11-06': '* made a friend at the pairing workshop',
                 '2024-11-08': '* finished [batches of batch viz](https://github.com/iconix/rc-batchviz)<br />* decided to prioritize creativity in batch',
                 '2024-11-11': '* found a fave community @ [the nature of code](https://natureofcode.com/) book club<br />* setup [obsidian](https://obsidian.md/) + [syncthing](https://syncthing.net/) for notes',
-                // '2024-11-12': '* first non-workshop pairing at rc with [Sufian Rhazi](https://abstract.properties/)',
                 '2024-11-12': '* first non-workshop pairing at rc',
                 '2024-11-13': '* completed [first p5.js sketch](https://iconix.github.io/rc-natureofcode/exercise_04/)',
-                // '2024-11-14': '* made an ml friend in [Karen Aragon](https://www.karenaragon.com/) while talking through my [batches of batch viz](https://github.com/iconix/rc-batchviz)',
                 '2024-11-14': '* made an ml friend while talking through my [batches of batch viz](https://github.com/iconix/rc-batchviz)',
                 '2024-11-15': '* deployed v0 of my main batch project: [my personal website](https://ohnadj.pages.dev/)',
                 '2024-11-18': '* published first real [blog post](https://ohnadj.pages.dev/blog/2024/11/rc-reflection-1/) on new personal website',
                 '2024-11-19': '* recreated a top-down pkmn-style town on the web as part of [impossible stuff day](https://github.com/iconix/rc-impossible-town)',
                 '2024-12-02': '* first visit to the hub in brooklyn',
                 '2024-12-05': '* found another fave community @ chart chat for data viz',
-                // '2024-12-12': '* started a \'heartening ml\' doc with my ml friend, [Karen Aragon](https://www.karenaragon.com/)<br />* end-of-batch ceremony for folks exiting batch',
                 '2024-12-12': '* started a \'heartening ml\' doc with my ml friend<br />* end-of-batch ceremony for folks exiting batch',
                 '2025-01-07': '* published first [blog post](https://ohnadj.pages.dev/blog/2025/01/rc-batchviz/) on a project (batches of batch viz)',
             }
@@ -482,7 +478,9 @@
                 const tooltipText = isExcluded
                     ? this.createExcludedTooltipText(date)
                     : isSpecial
-                        ? `${this.formatDate(date)}<br>${this.config.specialDays[dateString]}`
+                        ? `${this.formatDate(date)}<br />${this.config.specialDays[dateString]}`
+                    : isToday
+                        ? `${this.formatDate(date)}<br />Today`
                         : this.formatDate(date);
 
                 dayElement.addEventListener('mouseover', (e) => this.showTooltip(e, tooltipText));
@@ -500,7 +498,7 @@
                 const excludedRange = this.config.excludedRanges.find(range =>
                     date >= range.start && date <= range.end
                 );
-                return `${this.formatDate(date)}<br>${excludedRange ? excludedRange.label : this.isWeekend(date) ? 'Weekend' : ''}`;
+                return `${this.formatDate(date)}<br />${excludedRange ? excludedRange.label : this.isWeekend(date) ? 'Weekend' : ''}`;
             }
 
             init() {
