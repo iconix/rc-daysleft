@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>days left at rc</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📅</text></svg>">
+    <title id="page-title">loading...</title>
+    <link id="favicon" rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📅</text></svg>">
     <style>
         :root {
             /* base colors */
@@ -110,7 +110,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(10px, 1fr));
             gap: 8px;
-            padding-bottom: 100px;
+            margin-bottom: 2rem;
         }
 
         .day {
@@ -171,8 +171,8 @@
         */
 
         footer {
-            margin-top: -60px;
-            margin-bottom: 40px;
+            margin-top: 0;
+            margin-bottom: 2rem;
             font-size: 0.7rem;
             color: var(--color-footer-text);
             text-align: center;
@@ -181,22 +181,127 @@
         footer a {
             color: inherit;
         }
+
+        /* configuration */
+
+        .config-section {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            margin-bottom: 2rem;
+        }
+
+        .config-toggle {
+            color: var(--color-footer-text);
+            font-size: 0.8rem;
+            text-decoration: underline;
+            margin-bottom: 0.5rem;
+            padding: 0;
+        }
+
+        .config-panel {
+            background: var(--color-light);
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        .config-panel.hidden {
+            display: none;
+        }
+
+        .json-editor {
+            margin-bottom: 0.75rem;
+        }
+
+        #config-editor {
+            width: 100%;
+            height: 200px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            padding: 0.5rem;
+            border: 1px solid var(--color-dark);
+            border-radius: 3px;
+            background: var(--color-white);
+            resize: vertical;
+            tab-size: 2;
+        }
+
+        .validation-message {
+            margin-top: 0.25rem;
+            font-size: 0.85rem;
+            min-height: 1.5em;
+        }
+
+        .validation-message.error {
+            color: #dc2626;
+        }
+
+        .validation-message.success {
+            color: #16a34a;
+        }
+
+        .config-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .primary-button,
+        .secondary-button {
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .primary-button {
+            background: var(--color-dark);
+            color: var(--color-white);
+            border: none;
+        }
+
+        .secondary-button {
+            background: var(--color-white);
+            color: var(--color-dark);
+            border: 1px solid var(--color-dark);
+        }
+
+        .primary-button:disabled,
+        .secondary-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>days left at rc</h1>
-            <main>
-                <p>a visualization of my days left in the winter 1, 2024 <a href='https://www.recurse.com/' target='_blank' rel='nofollow noopener noreferrer'>recurse center</a> batch</p>
-                <div class="progress">
-                    <div class="bar"></div>
-                    <div id="progress-bar" class="progress-bar"></div>
-                    <h2 id="progress-text">Progress: 0%</h2>
-                </div>
-            </main>
+            <h1 id="main-heading">loading...</h1>
+            <p id="subtitle">loading...</p>
+            <div class="progress">
+                <div class="bar"></div>
+                <div id="progress-bar" class="progress-bar"></div>
+                <h2 id="progress-text">Progress: 0%</h2>
+            </div>
         </header>
-        <div id="day-grid" class="day-grid"></div>
+        <main>
+            <div id="day-grid" class="day-grid"></div>
+            <div class="config-section">
+                <button id="toggle-config" class="config-toggle">edit config</button>
+                <div id="config-panel" class="config-panel hidden">
+                    <div class="json-editor">
+                        <textarea id="config-editor" spellcheck="false"></textarea>
+                        <div id="validation-message" class="validation-message"></div>
+                    </div>
+                    <div class="config-actions">
+                        <button id="save-config" class="primary-button">Save Changes</button>
+                        <button id="reset-config" class="secondary-button">Reset to Default</button>
+                    </div>
+                </div>
+            </div>
+        </main>
         <footer>
             inspired by <a href='https://waitbutwhy.com/2014/05/life-weeks.html' target='_blank' rel='nofollow noopener noreferrer'>Your Life in Weeks</a> from Wait But Why. cribbed format from <a href='https://days.rory.codes/' target='_blank' rel='nofollow noopener noreferrer'>Day by Day</a> by Rory Flint.
         </footer>
@@ -210,6 +315,86 @@
             // use Date object to create local date, using the parsed year, month (0-based), and day
             return new Date(year, month - 1, day);
         }
+
+        // update JSON_CONFIG in the page source
+        function updatePageSourceConfig(newConfig) {
+            const scriptContent = document.querySelector('script').textContent;
+            const updatedScript = scriptContent.replace(
+                /let JSON_CONFIG = \{[\s\S]*?\};/,
+                `let JSON_CONFIG = ${JSON.stringify(newConfig, null, 2)};`
+            );
+            document.querySelector('script').textContent = updatedScript;
+            window.JSON_CONFIG = newConfig;
+        }
+
+        function hideConfigPanel() {
+            // hide config panel
+            const configPanel = document.getElementById('config-panel');
+            configPanel.classList.add('hidden');
+
+            // hide edit button
+            const toggleConfig = document.getElementById('toggle-config');
+            toggleConfig.style.display = 'none';
+        }
+
+        function showConfigButton() {
+            // show edit button
+            const toggleConfig = document.getElementById('toggle-config');
+            toggleConfig.style.display = 'block';
+        }
+
+        // handle downloading the html with embedded config
+        function downloadHtmlWithConfig() {
+            // hide config panel before downloading
+            hideConfigPanel();
+
+            // get the current html content
+            const htmlContent = document.documentElement.outerHTML;
+
+            // create blob and download link
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const downloadUrl = URL.createObjectURL(blob);
+
+            // sanitize config title for use as filename
+            const sanitizedTitle = window.JSON_CONFIG.title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-') // replace non-alphanumeric chars with hyphens
+                .replace(/^-+|-+$/g, ''); // remove leading/trailing hyphens
+
+            // create and trigger download
+            const downloadLink = document.createElement('a');
+            downloadLink.href = downloadUrl;
+            downloadLink.download = `${sanitizedTitle}.html`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+
+            // clean up
+            URL.revokeObjectURL(downloadUrl);
+            showConfigButton();
+        }
+
+        // add download button to config panel UI
+        function addDownloadButton() {
+            const configActions = document.querySelector('.config-actions');
+            const downloadButton = document.createElement('button');
+            downloadButton.className = 'secondary-button';
+            downloadButton.textContent = 'Download HTML';
+            downloadButton.addEventListener('click', downloadHtmlWithConfig);
+            configActions.appendChild(downloadButton);
+        }
+
+        function handleKeyboardShortcuts(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault(); // prevent default browser save
+                hideConfigPanel();  // hide config panel before saving
+                downloadHtmlWithConfig();
+                showConfigButton(); // show edit config button again after saving
+            }
+        }
+
+        // add keyboard shortcut listener
+        document.addEventListener('keydown', handleKeyboardShortcuts);
 
         function ingestConfig(rawConfig) {
             // validate required fields
@@ -260,7 +445,7 @@
                     );
                 }
 
-                // Validate range is within the main date range
+                // validate range is within the main date range
                 if (rangeStart < startDate || rangeEnd > endDate) {
                     throw new Error(
                         `date range "${range.label}" (${formatDateForError(range.start)} to ${formatDateForError(range.end)}) ` +
@@ -276,6 +461,9 @@
             });
 
             return {
+                title: rawConfig.title,
+                subtitle: rawConfig.subtitle,
+                favicon: rawConfig.favicon || "📅",
                 startDate: toLocalDate(rawConfig.startDate),
                 endDate: toLocalDate(rawConfig.endDate),
                 excludedRanges: (rawConfig.excludedRanges || []).map(range => {
@@ -299,7 +487,10 @@
             };
         }
 
-        const JSON_CONFIG = {
+        let JSON_CONFIG = {
+            title: "days left at rc",
+            subtitle: "a visualization of my days left in the winter 1, 2024 [recurse center](https://www.recurse.com) batch",
+            favicon: "📅",
             startDate: '2024-11-04',
             endDate: '2025-02-14',
             excludedRanges: [
@@ -318,48 +509,274 @@
                     end: '2025-01-05',
                     label: 'Winter Break'
                 },
-                // {
-                //     start: '2025-01-20',
-                //     end: '2025-01-20',
-                //     label: 'MLK Day',
-                // },
             ],
             excludeWeekends: true,
             specialDays: {
-                '2024-11-06': '* made a friend at the pairing workshop',
-                '2024-11-08': '* finished [batches of batch viz](https://github.com/iconix/rc-batchviz)<br />* decided to prioritize creativity in batch',
-                '2024-11-11': '* found a fave community @ [the nature of code](https://natureofcode.com/) book club<br />* setup [obsidian](https://obsidian.md/) + [syncthing](https://syncthing.net/) for notes',
-                '2024-11-12': '* first non-workshop pairing at rc',
-                '2024-11-13': '* completed [first p5.js sketch](https://iconix.github.io/rc-natureofcode/exercise_04/)',
-                '2024-11-14': '* made an ml friend while talking through my [batches of batch viz](https://github.com/iconix/rc-batchviz)',
-                '2024-11-15': '* deployed v0 of my main batch project: [my personal website](https://ohnadj.pages.dev/)',
-                '2024-11-18': '* published first real [blog post](https://ohnadj.pages.dev/blog/2024/11/rc-reflection-1/) on new personal website',
-                '2024-11-19': '* recreated a top-down pkmn-style town on the web as part of [impossible stuff day](https://github.com/iconix/rc-impossible-town)',
-                '2024-12-02': '* first visit to the hub in brooklyn',
-                '2024-12-05': '* found another fave community @ chart chat for data viz',
-                '2024-12-12': '* started a \'heartening ml\' doc with my ml friend<br />* end-of-batch ceremony for folks exiting batch',
-                '2025-01-07': '* published first [blog post](https://ohnadj.pages.dev/blog/2025/01/rc-batchviz/) on a project (batches of batch viz)',
+                '2024-11-06': 'made a friend at the pairing workshop',
+                '2024-11-08': 'finished [batches of batch viz](https://github.com/iconix/rc-batchviz)\ndecided to prioritize creativity in batch',
+                '2024-11-11': 'found a fave community @ [the nature of code](https://natureofcode.com/) book club\nsetup [obsidian](https://obsidian.md/) + [syncthing](https://syncthing.net/) for notes',
+                '2024-11-12': 'first non-workshop pairing at rc',
+                '2024-11-13': 'completed [first p5.js sketch](https://iconix.github.io/rc-natureofcode/exercise_04/)',
+                '2024-11-14': 'made an ml friend while talking through my [batches of batch viz](https://github.com/iconix/rc-batchviz)',
+                '2024-11-15': 'deployed v0 of my main batch project: [my personal website](https://ohnadj.pages.dev/)',
+                '2024-11-18': 'published first real [blog post](https://ohnadj.pages.dev/blog/2024/11/rc-reflection-1/) on new personal website',
+                '2024-11-19': 'recreated a top-down pkmn-style town on the web as part of [impossible stuff day](https://github.com/iconix/rc-impossible-town)',
+                '2024-12-02': 'first visit to the hub in brooklyn',
+                '2024-12-05': 'found another fave community @ chart chat for data viz',
+                '2024-12-12': 'started a \'heartening ml\' doc with my ml friend\nend-of-batch ceremony for folks exiting batch',
+                '2025-01-07': 'published first [blog post](https://ohnadj.pages.dev/blog/2025/01/rc-batchviz/) on a project (batches of batch viz)',
             }
         };
-        const CONFIG = ingestConfig(JSON_CONFIG);
 
-        function parseMarkdownLinks(text) {
+        // store the original default config when the page loads
+        const DEFAULT_CONFIG = JSON.parse(JSON.stringify(JSON_CONFIG));
+
+        const LOCAL_STORAGE_KEY = 'dayVisualizerConfig';
+
+        class ConfigManager {
+            constructor(defaultConfig, onConfigUpdate) {
+                this.defaultConfig = defaultConfig;
+                this.onConfigUpdate = onConfigUpdate;
+                this.initializeUI();
+                this.loadConfig();
+                addDownloadButton();
+
+                this.onConfigUpdate(this.currentConfig);
+            }
+
+            initializeUI() {
+                // setup UI elements
+                this.configEditor = document.getElementById('config-editor');
+                this.validationMessage = document.getElementById('validation-message');
+                this.saveButton = document.getElementById('save-config');
+
+                // toggle config panel
+                document.getElementById('toggle-config').addEventListener('click', () => {
+                    document.getElementById('config-panel').classList.toggle('hidden');
+                });
+
+                // save and reset buttons
+                this.saveButton.addEventListener('click', () => this.saveConfig());
+                document.getElementById('reset-config').addEventListener('click', () => this.resetConfig());
+
+                // live validation
+                this.configEditor.addEventListener('input', () => this.validateConfig());
+
+                // enable tab key in textarea
+                this.configEditor.addEventListener('keydown', (e) => {
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        const start = this.configEditor.selectionStart;
+                        const end = this.configEditor.selectionEnd;
+                        this.configEditor.value = this.configEditor.value.substring(0, start) + '  ' +
+                                                this.configEditor.value.substring(end);
+                        this.configEditor.selectionStart = this.configEditor.selectionEnd = start + 2;
+                    }
+                });
+
+                // save on blur if config is valid
+                this.configEditor.addEventListener('blur', () => {
+                    if (this.validateConfig()) {
+                        this.saveConfig();
+                    }
+                });
+            }
+
+            validateConfig() {
+                try {
+                    const config = JSON.parse(this.configEditor.value);
+
+                    // validate favicon
+                    if (config.favicon !== undefined && typeof config.favicon !== 'string') {
+                        throw new Error('favicon must be a string if provided');
+                    }
+
+                    // validate text fields
+                    if (!config.title || typeof config.title !== 'string') {
+                        throw new Error('title is required and must be a string');
+                    }
+                    if (config.subtitle !== undefined && typeof config.subtitle !== 'string') {
+                        throw new Error('subtitle must be a string if provided');
+                    }
+
+                    // validate required fields
+                    if (!config.startDate || !config.endDate) {
+                        throw new Error('startDate and endDate are required');
+                    }
+
+                    // validate date formats
+                    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+                    if (!dateRegex.test(config.startDate) || !dateRegex.test(config.endDate)) {
+                        throw new Error('Dates must be in YYYY-MM-DD format');
+                    }
+
+                    // validate date range
+                    const start = new Date(config.startDate);
+                    const end = new Date(config.endDate);
+                    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                        throw new Error('Invalid date values');
+                    }
+                    if (end <= start) {
+                        throw new Error('endDate must be after startDate');
+                    }
+
+                    // validate excluded ranges
+                    if (config.excludedRanges) {
+                        if (!Array.isArray(config.excludedRanges)) {
+                            throw new Error('excludedRanges must be an array');
+                        }
+                        config.excludedRanges.forEach((range, i) => {
+                            if (!range.start || !range.end || !range.label) {
+                                throw new Error(`excludedRanges[${i}] missing required fields`);
+                            }
+                            if (!dateRegex.test(range.start) || !dateRegex.test(range.end)) {
+                                throw new Error(`excludedRanges[${i}] invalid date format`);
+                            }
+                            const rangeStart = new Date(range.start);
+                            const rangeEnd = new Date(range.end);
+                            if (rangeEnd < rangeStart) {
+                                throw new Error(`excludedRanges[${i}] end date must be after start date`);
+                            }
+                            if (rangeStart < start || rangeEnd > end) {
+                                throw new Error(`excludedRanges[${i}] must be within main date range`);
+                            }
+                        });
+                    }
+
+                    // validate special days
+                    if (config.specialDays) {
+                        if (typeof config.specialDays !== 'object' || Array.isArray(config.specialDays)) {
+                            throw new Error('specialDays must be an object');
+                        }
+                        Object.entries(config.specialDays).forEach(([date, label]) => {
+                            if (!dateRegex.test(date)) {
+                                throw new Error(`Invalid date format in specialDays: ${date}`);
+                            }
+                            const specialDate = new Date(date);
+                            if (specialDate < start || specialDate > end) {
+                                throw new Error(`Special day ${date} must be within main date range`);
+                            }
+                            if (typeof label !== 'string') {
+                                throw new Error(`Special day ${date} must have a string label`);
+                            }
+                        });
+                    }
+
+                    this.validationMessage.textContent = 'Configuration is valid';
+                    this.validationMessage.className = 'validation-message success';
+                    this.saveButton.disabled = false;
+                    return true;
+                } catch (error) {
+                    this.validationMessage.textContent = `Error: ${error.message}`;
+                    this.validationMessage.className = 'validation-message error';
+                    this.saveButton.disabled = true;
+                    return false;
+                }
+            }
+
+            formatJSON(obj) {
+                return JSON.stringify(obj, null, 2);
+            }
+
+            loadConfig() {
+                const savedConfig = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (savedConfig) {
+                    try {
+                        const parsedConfig = JSON.parse(savedConfig);
+                        // validate the config through ingestConfig
+                        ingestConfig(parsedConfig);
+                        this.currentConfig = parsedConfig;
+                        updatePageSourceConfig(parsedConfig);
+                    } catch (error) {
+                        console.warn('Invalid saved configuration, falling back to default:', error);
+                        localStorage.removeItem(LOCAL_STORAGE_KEY);
+                        this.currentConfig = this.defaultConfig;
+                        updatePageSourceConfig(this.defaultConfig);
+                    }
+                } else {
+                    this.currentConfig = this.defaultConfig;
+                    updatePageSourceConfig(this.defaultConfig);
+                }
+
+                this.configEditor.value = this.formatJSON(this.currentConfig);
+                this.validateConfig();
+            }
+
+            saveConfig() {
+                if (this.validateConfig()) {
+                    const newConfig = JSON.parse(this.configEditor.value);
+
+                    // update local storage
+                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newConfig));
+
+                    // update both the current config and the page's JSON_CONFIG
+                    this.currentConfig = newConfig;
+                    updatePageSourceConfig(newConfig);
+
+                    this.onConfigUpdate(newConfig);
+                    this.validationMessage.textContent = 'Configuration saved successfully';
+                    this.validationMessage.className = 'validation-message success';
+                }
+            }
+
+            resetConfig() {
+                // remove from local storage
+                localStorage.removeItem(LOCAL_STORAGE_KEY);
+
+                // reset to the original default config we stored
+                this.currentConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+                updatePageSourceConfig(this.currentConfig);
+
+                this.configEditor.value = this.formatJSON(this.currentConfig);
+                this.validateConfig();
+                this.onConfigUpdate(this.currentConfig);
+            }
+
+            formatJSON(obj) {
+                return JSON.stringify(obj, null, 2);
+            }
+        }
+
+        function parseMarkdownLinks(text, asHtml = false) {
             // regex to match markdown links [text](url)
             const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
 
-            // TODO: make links clickable again?
-            // return text.replace(linkRegex, '<a href="$2" target="_blank" rel="nofollow noopener noreferrer">$1</a>');
-            return text.replace(linkRegex, '$1');
+            return text.replace(linkRegex, (_, text, url) =>
+                asHtml
+                    ? `<a href="${url}" target="_blank" rel="nofollow noopener noreferrer">${text}</a>`
+                    : text
+            );
         }
 
         class DayVisualizer {
             constructor(config) {
                 this.config = config;
+                this.updateFavicon();
                 this.grid = document.getElementById('day-grid');
                 this.progressBar = document.getElementById('progress-bar');
                 this.progressText = document.getElementById('progress-text');
                 this.tooltip = this.createTooltip();
+                this.updateTextElements();
                 this.init();
+            }
+
+            updateFavicon() {
+                const faviconLink = document.getElementById('favicon');
+                const emoji = this.config.favicon || "📅";
+                faviconLink.href = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>${emoji}</text></svg>`;
+            }
+
+            updateTextElements() {
+                document.getElementById('page-title').textContent = this.config.title;
+                document.getElementById('main-heading').textContent = this.config.title;
+
+                const subtitleElement = document.getElementById('subtitle');
+                if (this.config.subtitle) {
+                    subtitleElement.innerHTML = parseMarkdownLinks(this.config.subtitle, true);
+                    subtitleElement.style.display = 'block';
+                } else {
+                    subtitleElement.style.display = 'none';
+                }
             }
 
             createTooltip() {
@@ -378,9 +795,17 @@
                 });
             }
 
+            formatSpecialDayDescription(description) {
+                // split the description into lines
+                const lines = description.split('\n');
+                // add '* ' prefix to each line and join back with <br /> for html display
+                return lines.map(line => `* ${line}`).join('<br />');
+            }
+
             getActiveDaysLeft() {
                 const now = new Date();
-                return this.getDaysSince(now, this.config.endDate);
+                const startDate = now > this.config.startDate ? now : this.config.startDate;
+                return this.getDaysSince(startDate, this.config.endDate);
             }
 
             getDaysSince(start, end) {
@@ -400,11 +825,29 @@
                 const end = this.config.endDate;
                 const now = new Date();
 
+                if (now < start) {
+                    return "0.00";
+                }
+
                 const total = this.getDaysSince(start, end);
                 const elapsed = this.getDaysSince(start, now);
 
                 const progress = Math.max(0, Math.min(100, (elapsed / total) * 100));
                 return progress.toFixed(2);
+            }
+
+            getProgressText() {
+                const now = new Date();
+                const progress = this.calculateProgress();
+
+                if (now < this.config.startDate) {
+                    // calculate days until start
+                    const daysUntilStart = this.getDaysSince(now, this.config.startDate);
+                    return `Progress: ${progress}% (starts in ${daysUntilStart} days)`;
+                } else {
+                    const daysLeft = this.getActiveDaysLeft();
+                    return `Progress: ${progress}% (${daysLeft} days left)`;
+                }
             }
 
             showTooltip(event, text) {
@@ -478,7 +921,7 @@
                 const tooltipText = isExcluded
                     ? this.createExcludedTooltipText(date)
                     : isSpecial
-                        ? `${this.formatDate(date)}<br />${this.config.specialDays[dateString]}`
+                        ? `${this.formatDate(date)}<br />${this.formatSpecialDayDescription(this.config.specialDays[dateString])}`
                     : isToday
                         ? `${this.formatDate(date)}<br />Today`
                         : this.formatDate(date);
@@ -514,19 +957,33 @@
 
                 const progress = this.calculateProgress();
                 this.progressBar.style.width = `${progress}%`;
-                this.progressText.textContent = `Progress: ${progress}% (${this.getActiveDaysLeft()} days left)`;
+                this.progressText.textContent = this.getProgressText();
 
                 // update progress periodically
                 setInterval(() => {
                     const newProgress = this.calculateProgress();
                     this.progressBar.style.width = `${newProgress}%`;
-                    this.progressText.textContent = `Progress: ${newProgress}% (${this.getActiveDays()} days left)`;
+                    this.progressText.textContent = this.getProgressText();
                 }, 3600000); // update every hour
             }
         }
 
         // initialize the visualizer
-        const visualizer = new DayVisualizer(CONFIG);
+        let visualizer;
+
+        function initializeVisualizer(config) {
+            // remove existing grid if it exists
+            const existingGrid = document.getElementById('day-grid');
+            existingGrid.innerHTML = '';
+
+            // create new visualizer with updated config
+            visualizer = new DayVisualizer(ingestConfig(config));
+        }
+
+        // initialize configuration manager
+        const configManager = new ConfigManager(JSON_CONFIG, (newConfig) => {
+            initializeVisualizer(newConfig);
+        });
     </script>
 </body>
 </html>
