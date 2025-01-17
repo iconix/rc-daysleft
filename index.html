@@ -798,8 +798,13 @@
             formatSpecialDayDescription(description) {
                 // split the description into lines
                 const lines = description.split('\n');
-                // add '* ' prefix to each line and join back with <br /> for html display
-                return lines.map(line => `* ${line}`).join('<br />');
+
+                // only add asterisks if there are multiple lines
+                if (lines.length > 1) {
+                    // add '* ' prefix to each line and join back with <br /> for html display
+                    return lines.map(line => `* ${line}`).join('<br />');
+                }
+                return lines[0]; // else return single line without asterisk
             }
 
             getActiveDaysLeft() {
