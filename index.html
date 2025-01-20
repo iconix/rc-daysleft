@@ -525,6 +525,8 @@
                 '2024-12-05': 'found another fave community @ chart chat for data viz',
                 '2024-12-12': 'started a \'heartening ml\' doc with my ml friend\nend-of-batch ceremony for folks exiting batch',
                 '2025-01-07': 'published first [blog post](https://ohnadj.pages.dev/blog/2025/01/rc-batchviz/) on a project (batches of batch viz)',
+                '2025-01-10': 'deployed this [\'days left at rc\' viz](https://iconix.github.io/rc-daysleft/)!',
+                '2025-01-13': 'started on next iteration (v1) of [my personal website](https://ohnadj.pages.dev/): let\'s call it nadj.land'
             }
         };
 
@@ -910,14 +912,14 @@
                 const isSpecial = this.config.specialDays[dateString];
                 const isExcluded = this.isDateExcluded(date);
 
-                if (isExcluded) {
+                if (isToday) {
+                    dayElement.classList.add('today');
+                    dayElement.id = 'today';
+                }
+                else if (isExcluded) {
                     dayElement.classList.add('excluded');
                 } else {
                     dayElement.classList.add(isPast ? 'past' : 'future');
-                    if (isToday) {
-                        dayElement.classList.add('today');
-                        dayElement.id = 'today';
-                    }
                     if (isSpecial) {
                         dayElement.classList.add('special');
                     }
@@ -943,10 +945,13 @@
             }
 
             createExcludedTooltipText(date) {
+                const today = new Date();
+                const isToday = date.toDateString() === today.toDateString();
+
                 const excludedRange = this.config.excludedRanges.find(range =>
                     date >= range.start && date <= range.end
                 );
-                return `${this.formatDate(date)}<br />${excludedRange ? excludedRange.label : this.isWeekend(date) ? 'Weekend' : ''}`;
+                return `${this.formatDate(date)}<br />${isToday ? 'Today (' : ''}${excludedRange ? excludedRange.label : this.isWeekend(date) ? 'Weekend' : ''}${isToday ? ')' : ''}`;
             }
 
             init() {
