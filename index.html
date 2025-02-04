@@ -18,12 +18,13 @@
             --color-past: #4CAF50;
             --color-future: #E8F5E9;
             --color-special: #1B5E20;
+            --color-special-inactive: #2E7D32;
 
             /* ui colors */
             --color-tooltip-bg: #000000;
             --color-tooltip-text: #ffffff;
-            --color-excluded-bg: #f5f5f5;
-            --color-excluded-border: #bfbfbf;
+            --color-inactive-bg: #f5f5f5;
+            --color-inactive-border: #bfbfbf;
             --color-footer-text: #666666;
         }
 
@@ -137,11 +138,21 @@
             border-radius: 0;
         }
 
-        .day.excluded {
-            background-color: var(--color-excluded-bg);
-            border: 1px dashed var(--color-excluded-border);
+        .day.inactive {
+            background-color: var(--color-inactive-bg);
+            border: 1px dashed var(--color-inactive-border);
             opacity: 0.7;
             border-radius: 50%;
+        }
+
+        .day.special.special-inactive {
+            background-image: repeating-linear-gradient(
+                45deg,
+                var(--color-special),
+                var(--color-special) 2px,
+                var(--color-special-inactive) 2px,
+                var(--color-special-inactive) 4px
+            );
         }
 
         .tooltip {
@@ -428,8 +439,8 @@
                 throw new Error(`end date (${formatDateForError(rawConfig.endDate)}) must be after start date (${formatDateForError(rawConfig.startDate)})`);
             }
 
-            // transform and validate excluded ranges
-            const excludedRanges = (rawConfig.excludedRanges || []).map(range => {
+            // transform and validate inactive ranges
+            const inactiveRanges = (rawConfig.inactiveRanges || []).map(range => {
                 if (!isValidDate(range.start) || !isValidDate(range.end)) {
                     throw new Error(`invalid date format in range: ${range.label}`);
                 }
@@ -466,7 +477,7 @@
                 favicon: rawConfig.favicon || "📅",
                 startDate: toLocalDate(rawConfig.startDate),
                 endDate: toLocalDate(rawConfig.endDate),
-                excludedRanges: (rawConfig.excludedRanges || []).map(range => {
+                inactiveRanges: (rawConfig.inactiveRanges || []).map(range => {
                     if (!isValidDate(range.start) || !isValidDate(range.end)) {
                         throw new Error(`invalid date range: ${range.label}`);
                     }
@@ -476,7 +487,7 @@
                         label: range.label
                     };
                 }),
-                excludeWeekends: Boolean(rawConfig.excludeWeekends),
+                inactiveWeekends: Boolean(rawConfig.inactiveWeekends),
                 specialDays: Object.entries(rawConfig.specialDays || {}).reduce((acc, [date, label]) => {
                     if (!isValidDate(date)) {
                         throw new Error(`invalid special day date: ${date}`);
@@ -493,7 +504,7 @@
             favicon: "📅",
             startDate: '2024-11-04',
             endDate: '2025-02-14',
-            excludedRanges: [
+            inactiveRanges: [
                 {
                     start: '2024-11-05',
                     end: '2024-11-05',
@@ -510,7 +521,7 @@
                     label: 'Winter Break'
                 },
             ],
-            excludeWeekends: true,
+            inactiveWeekends: true,
             specialDays: {
                 '2024-11-06': 'pair programmed conway\'s game of life with annie and cindy at the pairing workshop',
                 '2024-11-08': 'finished [batches of batch viz](https://github.com/iconix/rc-batchviz)\ndecided to prioritize creativity in batch',
@@ -627,25 +638,25 @@
                         throw new Error('endDate must be after startDate');
                     }
 
-                    // validate excluded ranges
-                    if (config.excludedRanges) {
-                        if (!Array.isArray(config.excludedRanges)) {
-                            throw new Error('excludedRanges must be an array');
+                    // validate inactive ranges
+                    if (config.inactiveRanges) {
+                        if (!Array.isArray(config.inactiveRanges)) {
+                            throw new Error('inactiveRanges must be an array');
                         }
-                        config.excludedRanges.forEach((range, i) => {
+                        config.inactiveRanges.forEach((range, i) => {
                             if (!range.start || !range.end || !range.label) {
-                                throw new Error(`excludedRanges[${i}] missing required fields`);
+                                throw new Error(`inactiveRanges[${i}] missing required fields`);
                             }
                             if (!dateRegex.test(range.start) || !dateRegex.test(range.end)) {
-                                throw new Error(`excludedRanges[${i}] invalid date format`);
+                                throw new Error(`inactiveRanges[${i}] invalid date format`);
                             }
                             const rangeStart = new Date(range.start);
                             const rangeEnd = new Date(range.end);
                             if (rangeEnd < rangeStart) {
-                                throw new Error(`excludedRanges[${i}] end date must be after start date`);
+                                throw new Error(`inactiveRanges[${i}] end date must be after start date`);
                             }
                             if (rangeStart < start || rangeEnd > end) {
-                                throw new Error(`excludedRanges[${i}] must be within main date range`);
+                                throw new Error(`inactiveRanges[${i}] must be within main date range`);
                             }
                         });
                     }
@@ -824,7 +835,7 @@
                 let days = 0;
                 let currentDate = new Date(start);
                 while (currentDate <= end) {
-                    if (!this.isDateExcluded(currentDate)) {
+                    if (!this.isInactivePeriod(currentDate)) {
                         days++;
                     }
                     currentDate.setDate(currentDate.getDate() + 1);
@@ -896,20 +907,29 @@
                 return day === 0 || day === 6; // 0 is Sunday, 6 is Saturday
             }
 
-            isDateExcluded(date) {
+            isInactivePeriod(date) {
                 // remove any time information from date object
                 date = new Date(date.toDateString());
 
-                // check if date is marked as a special day first - if so, don't exclude it
-                const dateString = date.toISOString().split('T')[0];
-                if (this.config.specialDays[dateString]) {
-                    return false;
-                }
+                // check if date is marked as a special day first - if so, consider it active
+                // const dateString = date.toISOString().split('T')[0];
+                // if (this.config.specialDays[dateString]) {
+                //     return false;
+                // }
 
-                const isExcluded = this.config.excludedRanges.some(range =>
+                const isInRange = this.config.inactiveRanges.some(range =>
                     date >= range.start && date <= range.end
                 );
-                return isExcluded || (this.config.excludeWeekends && this.isWeekend(date));
+                return isInRange || (this.config.inactiveWeekends && this.isWeekend(date));
+            }
+
+            isSpecialDay(date) {
+                const dateString = date.toISOString().split('T')[0];
+                return Boolean(this.config.specialDays[dateString]);
+            }
+
+            isSpecialDayInInactivePeriod(date) {
+                return this.isSpecialDay(date) && this.isInactivePeriod(date);
             }
 
             createDay(date) {
@@ -919,30 +939,27 @@
                 const today = new Date();
                 const isPast = date < today;
                 const isToday = date.toDateString() === today.toDateString();
+                const isSpecial = this.isSpecialDay(date);
+                const isInactive = this.isInactivePeriod(date);
                 const dateString = date.toISOString().split('T')[0];
-                const isSpecial = this.config.specialDays[dateString];
-                const isExcluded = this.isDateExcluded(date);
 
                 if (isToday) {
                     dayElement.classList.add('today');
                     dayElement.id = 'today';
                 }
-                else if (isExcluded) {
-                    dayElement.classList.add('excluded');
+                else if (isInactive && !isSpecial) {
+                    dayElement.classList.add('inactive');
                 } else {
                     dayElement.classList.add(isPast ? 'past' : 'future');
                     if (isSpecial) {
                         dayElement.classList.add('special');
+                        if (isInactive) {
+                            dayElement.classList.add('special-inactive');
+                        }
                     }
                 }
 
-                const tooltipText = isExcluded
-                    ? this.createExcludedTooltipText(date)
-                    : isSpecial
-                        ? `${this.formatDate(date)}<br />${this.formatSpecialDayDescription(this.config.specialDays[dateString])}`
-                    : isToday
-                        ? `${this.formatDate(date)}<br />Today`
-                        : this.formatDate(date);
+                const tooltipText = this.createTooltipText(date, {isToday, isSpecial, isInactive});
 
                 dayElement.addEventListener('mouseover', (e) => this.showTooltip(e, tooltipText));
                 dayElement.addEventListener('mouseout', () => this.hideTooltip());
@@ -955,14 +972,35 @@
                 return dayElement;
             }
 
-            createExcludedTooltipText(date) {
-                const today = new Date();
-                const isToday = date.toDateString() === today.toDateString();
+            createTooltipText(date, {isToday, isSpecial, isInactive}) {
+                const dateString = date.toISOString().split('T')[0];
+                const parts = [];
 
-                const excludedRange = this.config.excludedRanges.find(range =>
-                    date >= range.start && date <= range.end
-                );
-                return `${this.formatDate(date)}<br />${isToday ? 'Today (' : ''}${excludedRange ? excludedRange.label : this.isWeekend(date) ? 'Weekend' : ''}${isToday ? ')' : ''}`;
+                // always start with the formatted date
+                parts.push(this.formatDate(date));
+
+                // add special day description if it exists
+                if (isSpecial) {
+                    parts.push(this.formatSpecialDayDescription(this.config.specialDays[dateString]));
+                }
+
+                // add inactive period reason if applicable
+                if (isInactive) {
+                    const range = this.config.inactiveRanges.find(r =>
+                        date >= r.start && date <= r.end
+                    );
+                    const inactiveReason = range ? range.label : 'Weekend';
+                    // only add parentheses if this isn't the only part
+                    const reasonText = parts.length > 1 ? `(${inactiveReason})` : inactiveReason;
+                    parts.push(reasonText);
+                }
+
+                // add "today" indicator if applicable
+                if (isToday && !isSpecial) {
+                    parts.push('Today');
+                }
+
+                return parts.join('<br />');
             }
 
             init() {
