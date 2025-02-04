@@ -413,6 +413,14 @@
                 throw new Error('start and end dates are required');
             }
 
+            // validate dayEndTime if provided
+            if (rawConfig.dayEndTime !== undefined) {
+                const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+                if (!timeRegex.test(rawConfig.dayEndTime)) {
+                    throw new Error('dayEndTime must be in HH:MM 24-hour format (e.g., "23:59")');
+                }
+            }
+
             // validate date format
             const isValidDate = (dateStr) => {
                 const date = toLocalDate(dateStr);
@@ -477,6 +485,7 @@
                 favicon: rawConfig.favicon || "📅",
                 startDate: toLocalDate(rawConfig.startDate),
                 endDate: toLocalDate(rawConfig.endDate),
+                dayEndTime: rawConfig.dayEndTime || "17:00",  // default to a common time for end of work day, if not specified
                 inactiveRanges: (rawConfig.inactiveRanges || []).map(range => {
                     if (!isValidDate(range.start) || !isValidDate(range.end)) {
                         throw new Error(`invalid date range: ${range.label}`);
@@ -615,6 +624,17 @@
                     }
                     if (config.subtitle !== undefined && typeof config.subtitle !== 'string') {
                         throw new Error('subtitle must be a string if provided');
+                    }
+
+                    // validate dayEndTime if provided
+                    if (config.dayEndTime !== undefined) {
+                        if (typeof config.dayEndTime !== 'string') {
+                            throw new Error('dayEndTime must be a string if provided');
+                        }
+                        const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+                        if (!timeRegex.test(config.dayEndTime)) {
+                            throw new Error('dayEndTime must be in HH:MM 24-hour format (e.g., "23:59")');
+                        }
                     }
 
                     // validate required fields
@@ -827,7 +847,17 @@
 
             getActiveDaysLeft() {
                 const now = new Date();
-                const startDate = now > this.config.startDate ? now : this.config.startDate;
+                const today = new Date(now.toDateString());
+                let startDate;
+
+                // if today is past end time, start counting from tomorrow
+                if (this.isPastEndTime(today)) {
+                    startDate = new Date(today);
+                    startDate.setDate(startDate.getDate() + 1);
+                } else {
+                    startDate = today;
+                }
+
                 return this.getDaysSince(startDate, this.config.endDate);
             }
 
@@ -847,15 +877,27 @@
                 const start = this.config.startDate;
                 const end = this.config.endDate;
                 const now = new Date();
+                const today = new Date(now.toDateString());
 
                 if (now < start) {
                     return "0.00";
                 }
 
-                const total = this.getDaysSince(start, end);
-                const elapsed = this.getDaysSince(start, now);
+                // calculate total active days
+                const totalActiveDays = this.getDaysSince(start, end);
 
-                const progress = Math.max(0, Math.min(100, (elapsed / total) * 100));
+                // calculate elapsed active days, considering end time
+                let endCountDate;
+                if (this.isPastEndTime(today)) {
+                    // if past end time, count the full day
+                    endCountDate = new Date(today);
+                    endCountDate.setDate(endCountDate.getDate() + 1);
+                } else {
+                    endCountDate = today;
+                }
+                const elapsedActiveDays = this.getDaysSince(start, endCountDate);
+
+                const progress = Math.max(0, Math.min(100, (elapsedActiveDays / totalActiveDays) * 100));
                 return progress.toFixed(2);
             }
 
@@ -902,6 +944,20 @@
                 this.tooltip.style.display = 'none';
             }
 
+            isPastEndTime(date) {
+                // when to consider the current day complete (24-hour format)
+                if (!this.config.dayEndTime) return false;
+
+                const now = new Date();
+                if (date.getDate() !== now.getDate()) return false;
+
+                const [hours, minutes] = this.config.dayEndTime.split(':').map(Number);
+                const endTime = new Date(now);
+                endTime.setHours(hours, minutes, 0, 0);
+
+                return now >= endTime;
+            }
+
             isWeekend(date) {
                 const day = date.getDay();
                 return day === 0 || day === 6; // 0 is Sunday, 6 is Saturday
@@ -932,34 +988,63 @@
                 return this.isSpecialDay(date) && this.isInactivePeriod(date);
             }
 
-            createDay(date) {
-                const dayElement = document.createElement('div');
-                dayElement.className = 'day';
+            getDayState(date, today) {
+                let state = {
+                    isBeforeToday: date < new Date(today.toDateString()),
+                    isToday: date.toDateString() === today.toDateString(),
+                    isSpecial: this.isSpecialDay(date),
+                    isInactive: this.isInactivePeriod(date)
+                };
 
-                const today = new Date();
-                const isPast = date < today;
-                const isToday = date.toDateString() === today.toDateString();
-                const isSpecial = this.isSpecialDay(date);
-                const isInactive = this.isInactivePeriod(date);
-                const dateString = date.toISOString().split('T')[0];
+                // a date is considered the "past" if it's before today OR if it's today and we're past the end time
+                state.isPast = state.isBeforeToday ||
+                              (state.isToday && this.isPastEndTime(date));
 
-                if (isToday) {
-                    dayElement.classList.add('today');
-                    dayElement.id = 'today';
+                return state;
+            }
+
+            getDayClasses(state) {
+                const classes = ['day'];
+
+                if (state.isInactive && !state.isSpecial) {
+                    classes.push('inactive');
+                    return classes;
                 }
-                else if (isInactive && !isSpecial) {
-                    dayElement.classList.add('inactive');
-                } else {
-                    dayElement.classList.add(isPast ? 'past' : 'future');
-                    if (isSpecial) {
-                        dayElement.classList.add('special');
-                        if (isInactive) {
-                            dayElement.classList.add('special-inactive');
-                        }
+
+                if (state.isToday) {
+                    classes.push('today');
+                }
+
+                // note: a day can be both today AND past
+                if (state.isPast) {
+                    classes.push('past');
+                } else if (!state.isToday) {
+                    classes.push('future');
+                }
+
+                if (state.isSpecial) {
+                    classes.push('special');
+                    if (state.isInactive) {
+                        classes.push('special-inactive');
                     }
                 }
 
-                const tooltipText = this.createTooltipText(date, {isToday, isSpecial, isInactive});
+                return classes;
+            }
+
+            createDay(date) {
+                const today = new Date();
+                const state = this.getDayState(date, today);
+
+                const dayElement = document.createElement('div');
+                dayElement.className = this.getDayClasses(state).join(' ');
+
+                // add id for today (if applicable)
+                if (state.isToday && !state.isPast) {
+                    dayElement.id = 'today';
+                }
+
+                const tooltipText = this.createTooltipText(date, state);
 
                 dayElement.addEventListener('mouseover', (e) => this.showTooltip(e, tooltipText));
                 dayElement.addEventListener('mouseout', () => this.hideTooltip());
@@ -972,7 +1057,7 @@
                 return dayElement;
             }
 
-            createTooltipText(date, {isToday, isSpecial, isInactive}) {
+            createTooltipText(date, dayState) {
                 const dateString = date.toISOString().split('T')[0];
                 const parts = [];
 
@@ -980,12 +1065,12 @@
                 parts.push(this.formatDate(date));
 
                 // add special day description if it exists
-                if (isSpecial) {
+                if (dayState.isSpecial) {
                     parts.push(this.formatSpecialDayDescription(this.config.specialDays[dateString]));
                 }
 
                 // add inactive period reason if applicable
-                if (isInactive) {
+                if (dayState.isInactive) {
                     const range = this.config.inactiveRanges.find(r =>
                         date >= r.start && date <= r.end
                     );
@@ -996,7 +1081,7 @@
                 }
 
                 // add "today" indicator if applicable
-                if (isToday && !isSpecial) {
+                if (dayState.isToday && !dayState.isSpecial) {
                     parts.push('Today');
                 }
 
